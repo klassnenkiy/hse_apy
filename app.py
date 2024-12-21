@@ -2,8 +2,10 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.express as px
-from sklearn.linear_model import LinearRegression
+import requests
+import aiohttp
 import asyncio
+from sklearn.linear_model import LinearRegression
 
 seasonal_temperatures = {
     "New York": {"winter": 0, "spring": 10, "summer": 25, "autumn": 15},
@@ -42,6 +44,33 @@ def generate_realistic_temperature_data(cities, num_years=10):
 
     df = pd.DataFrame(data)
     return df
+
+
+def get_current_temperature_sync(city, api_key):
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+        return data['main']['temp']
+    elif response.status_code == 401:
+        st.error("Error 401: Unauthorized. Please check your API key.")
+        return None
+    else:
+        st.error(f"Error fetching data: {response.status_code}")
+        return None
+
+
+async def get_current_temperature_async(city, api_key):
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                return data['main']['temp']
+            else:
+                st.error(f"Error fetching data: {response.status}")
+                return None
 
 
 def clean_and_convert_data(city_data):
@@ -96,19 +125,28 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line'):
         fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'),
                         name="Аномалии")
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
 
 
-async def compare_multiple_temperatures(cities, data, plot_type):
+async def compare_multiple_temperatures(cities, data, api_key, plot_type):
     tasks = []
     for city in cities:
-        tasks.append(analyze_and_plot_for_city(city, data, plot_type))
+        tasks.append(analyze_and_plot_for_city(city, data, api_key, plot_type))
 
     await asyncio.gather(*tasks)
 
 
-async def analyze_and_plot_for_city(city, data, plot_type):
+async def analyze_and_plot_for_city(city, data, api_key, plot_type):
     city_data = data[data['city'] == city]
+
+    if not api_key:
+        st.warning("API-ключ не введен. Данные о текущей температуре не будут отображены.")
+        return
+
+    current_temp_sync = get_current_temperature_sync(city, api_key)
+    if current_temp_sync is not None:
+        st.write(f"Текущая температура в {city}: {current_temp_sync}°C")
+
     analysis = analyze_city_data(city_data)
     season_stats = analysis['season_stats']
     anomalies = analysis['anomalies']
@@ -130,21 +168,19 @@ def main():
 
     selected_cities = st.sidebar.multiselect("Выберите города", cities, default=cities)
 
+    api_key = st.sidebar.text_input("Введите API-ключ для OpenWeatherMap")
+
     plot_type = st.sidebar.radio("Выберите тип графика", ('line', 'bar'))
 
-    if uploaded_file is not None:
+    if uploaded_file is not None and api_key:
         filtered_data = generate_realistic_temperature_data(selected_cities)
 
         if len(selected_cities) == 1:
             selected_city = selected_cities[0]
-            city_data = filtered_data[filtered_data['city'] == selected_city]
-            analysis = analyze_city_data(city_data)
-            season_stats = analysis['season_stats']
-            anomalies = analysis['anomalies']
-            visualize_temperature(city_data, season_stats, anomalies, plot_type)
+            compare_temperature(selected_city, filtered_data, api_key, plot_type)
         else:
             st.sidebar.subheader("Параллельный анализ всех выбранных городов")
-            asyncio.run(compare_multiple_temperatures(selected_cities, filtered_data, plot_type))
+            asyncio.run(compare_multiple_temperatures(selected_cities, filtered_data, api_key, plot_type))
 
     st.sidebar.subheader("Дополнительные возможности")
     st.sidebar.write("1. Параллельный анализ всех выбранных городов")
