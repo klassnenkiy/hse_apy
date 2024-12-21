@@ -7,13 +7,6 @@ import asyncio
 from sklearn.linear_model import LinearRegression
 
 
-API_KEY = "afb6147ee48eace31b567b026d07535e"
-CITIES = ['Berlin', 'Moscow', 'Cairo', 'Dubai']
-
-
-data = pd.read_csv("data/temperature_data.csv")
-
-
 def get_current_temperature_sync(city, api_key):
     url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
     response = requests.get(url)
@@ -22,11 +15,14 @@ def get_current_temperature_sync(city, api_key):
         data = response.json()
         return data['main']['temp']
     elif response.status_code == 401:
-        raise Exception("Error 401: Unauthorized. Please check your API key.")
+        st.error("Error 401: Unauthorized. Please check your API key.")
+        return None
     else:
-        raise Exception(f"Error fetching data: {response.status_code}")
+        st.error(f"Error fetching data: {response.status_code}")
+        return None
 
-async def get_current_temperature_async(city, api_key=API_KEY):
+
+async def get_current_temperature_async(city, api_key):
     url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
@@ -34,7 +30,9 @@ async def get_current_temperature_async(city, api_key=API_KEY):
                 data = await response.json()
                 return data['main']['temp']
             else:
-                raise Exception(f"Error fetching data: {response.status}")
+                st.error(f"Error fetching data: {response.status}")
+                return None
+
 
 def clean_and_convert_data(city_data):
     city_data['temperature'] = pd.to_numeric(city_data['temperature'], errors='coerce')
@@ -42,8 +40,8 @@ def clean_and_convert_data(city_data):
     city_data['rolling_mean'] = city_data['temperature'].rolling(window=30, center=True).mean()
     city_data['rolling_std'] = city_data['temperature'].rolling(window=30, center=True).std()
     city_data.dropna(subset=['temperature', 'rolling_mean', 'rolling_std'], inplace=True)
-
     return city_data
+
 
 def analyze_city_data(city_data):
     city_data = clean_and_convert_data(city_data)
@@ -63,6 +61,7 @@ def analyze_city_data(city_data):
         'anomalies': city_data[city_data['anomaly'] == True]
     }
 
+
 def visualize_temperature(data, season_stats, anomalies):
     st.title("Мониторинг температуры")
     mean_temp = season_stats['mean'].mean()
@@ -72,8 +71,10 @@ def visualize_temperature(data, season_stats, anomalies):
     st.write(f"Средняя температура: {mean_temp}°C")
     st.write(f"Минимальная температура: {min_temp}°C")
     st.write(f"Максимальная температура: {max_temp}°C")
+
     st.subheader("Сезонный профиль")
     st.write(season_stats)
+
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.plot(data['timestamp'], data['temperature'], label='Температура')
     ax.scatter(anomalies['timestamp'], anomalies['temperature'], color='red', label='Аномалии')
@@ -82,17 +83,42 @@ def visualize_temperature(data, season_stats, anomalies):
     ax.legend()
     st.pyplot(fig)
 
-def compare_temperature(city, data):
+
+def compare_temperature(city, data, api_key):
     city_data = data[data['city'] == city]
-    current_temp_sync = get_current_temperature_sync(city, API_KEY)
-    st.write(f"Текущая температура в {city}: {current_temp_sync}°C")
+
+
+    if not api_key:
+        st.warning("API-ключ не введен. Данные о текущей температуре не будут отображены.")
+        return
+
+    current_temp_sync = get_current_temperature_sync(city, api_key)
+    if current_temp_sync is not None:
+        st.write(f"Текущая температура в {city}: {current_temp_sync}°C")
+
     analysis = analyze_city_data(city_data)
     season_stats = analysis['season_stats']
     anomalies = analysis['anomalies']
 
     visualize_temperature(city_data, season_stats, anomalies)
 
-st.sidebar.title("Мониторинг температуры")
-selected_city = st.sidebar.selectbox("Выберите город", CITIES)
+def main():
+    st.sidebar.title("Мониторинг температуры")
 
-compare_temperature(selected_city, data)
+    uploaded_file = st.sidebar.file_uploader("Загрузите файл с данными", type=["csv"])
+    if uploaded_file is not None:
+        data = pd.read_csv(uploaded_file)
+        st.sidebar.success("Данные успешно загружены!")
+    else:
+        st.sidebar.warning("Пожалуйста, загрузите файл с данными.")
+
+    selected_city = st.sidebar.selectbox("Выберите город", ['Berlin', 'Moscow', 'Cairo', 'Dubai'])
+
+    api_key = st.sidebar.text_input("Введите API-ключ для OpenWeatherMap")
+
+    if uploaded_file is not None and api_key:
+        compare_temperature(selected_city, data, api_key)
+
+
+if __name__ == "__main__":
+    main()
