@@ -104,12 +104,13 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line'):
 
     if plot_type == 'line':
         fig = px.line(data, x='timestamp', y='temperature', title="Температура")
-        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'), name="Аномалии")
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red', size=10), name="Аномалии")
     elif plot_type == 'bar':
         fig = px.bar(data, x='timestamp', y='temperature', title="Температура")
-        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'), name="Аномалии")
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red', size=10), name="Аномалии")
 
     st.plotly_chart(fig)
+
 
 
 async def compare_temperature(city, data, api_key, plot_type):
