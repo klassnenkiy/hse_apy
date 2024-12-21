@@ -121,7 +121,8 @@ def display_temperature_data(temperatures):
     st.table(df[['Город', 'Температура', 'Эмодзи']])
 
 
-def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=None, trend_direction=None):
+def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=None, trend_direction=None,
+                          trend_slope=None):
     st.subheader(f"Температура в {city}")
     mean_temp = season_stats['mean'].mean()
     min_temp = season_stats['min'].min()
@@ -129,7 +130,7 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=
     st.write(f"Средняя температура: {mean_temp:.2f}°C")
     st.write(f"Минимальная температура: {min_temp:.2f}°C")
     st.write(f"Максимальная температура: {max_temp:.2f}°C")
-    if trend_direction is not None:
+    if trend_direction is not None and trend_slope is not None:
         st.write(f"Тренд: {trend_direction} (коэффициент наклона: {trend_slope:.4f})")
 
     st.subheader("Сезонный профиль")
@@ -271,7 +272,7 @@ def main():
             anomalies = analysis['anomalies']
             trend_direction = analysis['trend_direction']
             trend_slope = analysis['trend_slope']
-            visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction)
+            visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction, trend_slope)
             if selected_years:
                 visualize_temperature_by_year(selected_city, filtered_data, selected_years)
 
