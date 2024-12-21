@@ -59,18 +59,6 @@ async def get_current_temperature_async(city, api_key):
                 return None
 
 
-async def get_current_temperature_async(city, api_key):
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            if response.status == 200:
-                data = await response.json()
-                return data['main']['temp']
-            else:
-                st.error(f"Error fetching data: {response.status}")
-                return None
-
-
 def clean_and_convert_data(city_data):
     city_data['temperature'] = pd.to_numeric(city_data['temperature'], errors='coerce')
     city_data['timestamp'] = pd.to_datetime(city_data['timestamp'], errors='coerce')
@@ -124,16 +112,16 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line'):
     st.plotly_chart(fig)
 
 
-def compare_temperature(city, data, api_key, plot_type):
+async def compare_temperature(city, data, api_key, plot_type):
     city_data = data[data['city'] == city]
 
     if not api_key:
         st.warning("API-ключ не введен. Данные о текущей температуре не будут отображены.")
         return
 
-    current_temp_sync = get_current_temperature_sync(city, api_key)
-    if current_temp_sync is not None:
-        st.write(f"Текущая температура в {city}: {current_temp_sync}°C")
+    current_temp_async = await get_current_temperature_async(city, api_key)
+    if current_temp_async is not None:
+        st.write(f"Текущая температура в {city}: {current_temp_async}°C")
 
     analysis = analyze_city_data(city_data)
     season_stats = analysis['season_stats']
