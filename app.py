@@ -84,9 +84,12 @@ def analyze_city_data(city_data, sensitivity=2.0):
     model = LinearRegression()
     model.fit(X, y)
     trend_slope = model.coef_[0]
+    trend_direction = "положительный" if trend_slope > 0 else "отрицательный" if trend_slope < 0 else "плоский"
+
     return {
         'season_stats': season_stats,
         'trend_slope': trend_slope,
+        'trend_direction': trend_direction,
         'anomalies': city_data[city_data['anomaly'] == True]
     }
 
@@ -117,7 +120,7 @@ def display_temperature_data(temperatures):
     st.table(df[['Город', 'Температура', 'Эмодзи']])
 
 
-def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=None):
+def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=None, trend_direction=None):
     st.subheader(f"Температура в {city}")
     mean_temp = season_stats['mean'].mean()
     min_temp = season_stats['min'].min()
@@ -125,8 +128,12 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=
     st.write(f"Средняя температура: {mean_temp:.2f}°C")
     st.write(f"Минимальная температура: {min_temp:.2f}°C")
     st.write(f"Максимальная температура: {max_temp:.2f}°C")
+    if trend_direction is not None:
+        st.write(f"Тренд: {trend_direction} (коэффициент наклона: {trend_slope:.4f})")
+
     st.subheader("Сезонный профиль")
     st.write(season_stats)
+
     fig = None
     if plot_type == 'line':
         fig = px.line(data, x='timestamp', y='temperature', title=f"Температура в {city}")
@@ -259,7 +266,8 @@ def main():
             analysis = analyze_city_data(filtered_data, sensitivity)
             season_stats = analysis['season_stats']
             anomalies = analysis['anomalies']
-            visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city)
+            trend_direction = analysis['trend_direction']
+            visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction)
             if selected_years:
                 visualize_temperature_by_year(selected_city, filtered_data, selected_years)
 
