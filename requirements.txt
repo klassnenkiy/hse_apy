@@ -4,3 +4,4 @@ requests
 aiohttp
 matplotlib
 scikit-learn
+plotly

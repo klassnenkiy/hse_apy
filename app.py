@@ -1,12 +1,12 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import streamlit as st
+import plotly.express as px
 import requests
 import aiohttp
 import asyncio
 from sklearn.linear_model import LinearRegression
-from concurrent.futures import ThreadPoolExecutor
+
 
 seasonal_temperatures = {
     "New York": {"winter": 0, "spring": 10, "summer": 25, "autumn": 15},
@@ -115,37 +115,34 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line'):
     st.subheader("Сезонный профиль")
     st.write(season_stats)
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig = None
 
     if plot_type == 'line':
-        ax.plot(data['timestamp'], data['temperature'], label='Температура')
-        ax.scatter(anomalies['timestamp'], anomalies['temperature'], color='red', label='Аномалии')
+        fig = px.line(data, x='timestamp', y='temperature', title="Температура")
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'), name="Аномалии")
     elif plot_type == 'bar':
-        ax.bar(data['timestamp'], data['temperature'], label='Температура')
+        fig = px.bar(data, x='timestamp', y='temperature', title="Температура")
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'), name="Аномалии")
 
-    ax.set_xlabel("Дата")
-    ax.set_ylabel("Температура (°C)")
-    ax.legend()
-    st.pyplot(fig)
+    st.plotly_chart(fig)
 
 
-def compare_temperature(cities, data, api_key, plot_type='line'):
-    for city in cities:
-        city_data = data[data['city'] == city]
+def compare_temperature(city, data, api_key, plot_type):
+    city_data = data[data['city'] == city]
 
-        if not api_key:
-            st.warning("API-ключ не введен. Данные о текущей температуре не будут отображены.")
-            return
+    if not api_key:
+        st.warning("API-ключ не введен. Данные о текущей температуре не будут отображены.")
+        return
 
-        current_temp_sync = get_current_temperature_sync(city, api_key)
-        if current_temp_sync is not None:
-            st.write(f"Текущая температура в {city}: {current_temp_sync}°C")
+    current_temp_sync = get_current_temperature_sync(city, api_key)
+    if current_temp_sync is not None:
+        st.write(f"Текущая температура в {city}: {current_temp_sync}°C")
 
-        analysis = analyze_city_data(city_data)
-        season_stats = analysis['season_stats']
-        anomalies = analysis['anomalies']
+    analysis = analyze_city_data(city_data)
+    season_stats = analysis['season_stats']
+    anomalies = analysis['anomalies']
 
-        visualize_temperature(city_data, season_stats, anomalies, plot_type)
+    visualize_temperature(city_data, season_stats, anomalies, plot_type)
 
 
 def main():
@@ -164,12 +161,13 @@ def main():
 
     api_key = st.sidebar.text_input("Введите API-ключ для OpenWeatherMap")
 
-    plot_type = st.sidebar.selectbox("Выберите тип графика", ['line', 'bar'])
+    plot_type = st.sidebar.radio("Выберите тип графика", ('line', 'bar'))
 
     if uploaded_file is not None and api_key:
         filtered_data = generate_realistic_temperature_data(selected_cities)
 
-        compare_temperature(selected_cities, filtered_data, api_key, plot_type)
+        selected_city = st.sidebar.selectbox("Выберите город для анализа", selected_cities)
+        compare_temperature(selected_city, filtered_data, api_key, plot_type)
 
     st.sidebar.subheader("Дополнительные возможности")
     st.sidebar.write("1. Параллельный анализ всех выбранных городов")
