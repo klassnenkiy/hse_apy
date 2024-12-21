@@ -94,6 +94,7 @@ def analyze_city_data(city_data, sensitivity=2.0):
     }
 
 
+
 def get_temperature_color(temp):
     if temp > 30:
         return 'red'
@@ -237,11 +238,13 @@ def main():
                 combined_data = pd.concat(all_data)
                 season_stats = analyze_city_data(combined_data, sensitivity)['season_stats']
                 anomalies = analyze_city_data(combined_data, sensitivity)['anomalies']
+                trend_slope = analyze_city_data(combined_data, sensitivity)['trend_slope']
+                trend_direction = analyze_city_data(combined_data, sensitivity)['trend_direction']
                 for city in cities_selected:
                     city_data = combined_data[combined_data['city'] == city]
                     city_season_stats = season_stats[season_stats['season'].isin(city_data['season'].unique())]
                     city_anomalies = anomalies[anomalies['city'] == city]
-                    visualize_temperature(city_data, city_season_stats, city_anomalies, plot_type, city)
+                    visualize_temperature(city_data, city_season_stats, city_anomalies, plot_type, city, trend_direction)
                     if selected_years:
                         visualize_temperature_by_year(city, combined_data, selected_years)
 
@@ -267,6 +270,7 @@ def main():
             season_stats = analysis['season_stats']
             anomalies = analysis['anomalies']
             trend_direction = analysis['trend_direction']
+            trend_slope = analysis['trend_slope']
             visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction)
             if selected_years:
                 visualize_temperature_by_year(selected_city, filtered_data, selected_years)
