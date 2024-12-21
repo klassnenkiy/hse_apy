@@ -7,6 +7,7 @@ import aiohttp
 import asyncio
 from sklearn.linear_model import LinearRegression
 
+
 seasonal_temperatures = {
     "New York": {"winter": 0, "spring": 10, "summer": 25, "autumn": 15},
     "London": {"winter": 5, "spring": 11, "summer": 18, "autumn": 12},
@@ -44,6 +45,33 @@ def generate_realistic_temperature_data(cities, num_years=10):
 
     df = pd.DataFrame(data)
     return df
+
+
+def get_current_temperature_sync(city, api_key):
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+        return data['main']['temp']
+    elif response.status_code == 401:
+        st.error("Error 401: Unauthorized. Please check your API key.")
+        return None
+    else:
+        st.error(f"Error fetching data: {response.status_code}")
+        return None
+
+
+async def get_current_temperature_async(city, api_key):
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                return data['main']['temp']
+            else:
+                st.error(f"Error fetching data: {response.status}")
+                return None
 
 
 def clean_and_convert_data(city_data):
@@ -87,37 +115,19 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line'):
     st.subheader("Сезонный профиль")
     st.write(season_stats)
 
-    # Проверим, что данные не пустые
-    if data.empty:
-        st.error("Нет данных для отображения.")
-        return
-
-    # Создание графика
     fig = None
 
     if plot_type == 'line':
         fig = px.line(data, x='timestamp', y='temperature', title="Температура")
-        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'),
-                        name="Аномалии")
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'), name="Аномалии")
     elif plot_type == 'bar':
         fig = px.bar(data, x='timestamp', y='temperature', title="Температура")
-        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'),
-                        name="Аномалии")
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'), name="Аномалии")
 
-    # Если график был создан, отобразим его
-    if fig is not None:
-        st.plotly_chart(fig)
+    st.plotly_chart(fig)
 
 
-async def compare_multiple_temperatures(cities, data, api_key, plot_type):
-    tasks = []
-    for city in cities:
-        tasks.append(analyze_and_plot_for_city(city, data, api_key, plot_type))
-
-    await asyncio.gather(*tasks)
-
-
-async def analyze_and_plot_for_city(city, data, api_key, plot_type):
+def compare_temperature(city, data, api_key, plot_type):
     city_data = data[data['city'] == city]
 
     if not api_key:
@@ -156,16 +166,14 @@ def main():
     if uploaded_file is not None and api_key:
         filtered_data = generate_realistic_temperature_data(selected_cities)
 
-        if len(selected_cities) == 1:
-            selected_city = selected_cities[0]
-            compare_temperature(selected_city, filtered_data, api_key, plot_type)
-        else:
-            st.sidebar.subheader("Параллельный анализ всех выбранных городов")
-            asyncio.run(compare_multiple_temperatures(selected_cities, filtered_data, api_key, plot_type))
+        selected_city = st.sidebar.selectbox("Выберите город для анализа", selected_cities)
+        compare_temperature(selected_city, filtered_data, api_key, plot_type)
 
     st.sidebar.subheader("Дополнительные возможности")
     st.sidebar.write("1. Параллельный анализ всех выбранных городов")
     st.sidebar.write("2. Выбор различных типов графиков (линейный, столбчатый)")
+
+    st.sidebar.button("Выполнить параллельный анализ")
 
 
 if __name__ == "__main__":
