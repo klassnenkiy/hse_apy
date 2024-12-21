@@ -1,4 +1,4 @@
-import pandas as pd
+mport pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.express as px
@@ -47,19 +47,16 @@ def generate_realistic_temperature_data(cities, num_years=10):
     return df
 
 
-def get_current_temperature_sync(city, api_key):
+async def get_current_temperature_async(city, api_key):
     url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        data = response.json()
-        return data['main']['temp']
-    elif response.status_code == 401:
-        st.error("Error 401: Unauthorized. Please check your API key.")
-        return None
-    else:
-        st.error(f"Error fetching data: {response.status_code}")
-        return None
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                return data['main']['temp']
+            else:
+                st.error(f"Error fetching data: {response.status}")
+                return None
 
 
 async def get_current_temperature_async(city, api_key):
@@ -145,6 +142,15 @@ def compare_temperature(city, data, api_key, plot_type):
     visualize_temperature(city_data, season_stats, anomalies, plot_type)
 
 
+async def parallel_analysis(selected_cities, filtered_data, api_key, plot_type):
+    tasks = []
+    for city in selected_cities:
+        task = asyncio.ensure_future(compare_temperature(city, filtered_data, api_key, plot_type))
+        tasks.append(task)
+
+    await asyncio.gather(*tasks)
+
+
 def main():
     st.sidebar.title("Мониторинг температуры")
 
@@ -156,25 +162,22 @@ def main():
         st.sidebar.warning("Пожалуйста, загрузите файл с данными.")
 
     cities = list(seasonal_temperatures.keys())
-
     selected_cities = st.sidebar.multiselect("Выберите города", cities, default=cities)
 
     api_key = st.sidebar.text_input("Введите API-ключ для OpenWeatherMap")
-
     plot_type = st.sidebar.radio("Выберите тип графика", ('line', 'bar'))
 
     if uploaded_file is not None and api_key:
         filtered_data = generate_realistic_temperature_data(selected_cities)
 
-        selected_city = st.sidebar.selectbox("Выберите город для анализа", selected_cities)
-        compare_temperature(selected_city, filtered_data, api_key, plot_type)
+        if selected_cities:
+            asyncio.run(parallel_analysis(selected_cities, filtered_data, api_key, plot_type))
 
     st.sidebar.subheader("Дополнительные возможности")
     st.sidebar.write("1. Параллельный анализ всех выбранных городов")
     st.sidebar.write("2. Выбор различных типов графиков (линейный, столбчатый)")
 
     st.sidebar.button("Выполнить параллельный анализ")
-
 
 if __name__ == "__main__":
     main()
