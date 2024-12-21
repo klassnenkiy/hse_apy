@@ -245,7 +245,7 @@ def main():
                     city_data = combined_data[combined_data['city'] == city]
                     city_season_stats = season_stats[season_stats['season'].isin(city_data['season'].unique())]
                     city_anomalies = anomalies[anomalies['city'] == city]
-                    visualize_temperature(city_data, city_season_stats, city_anomalies, plot_type, city, trend_direction)
+                    visualize_temperature(city_data, city_season_stats, city_anomalies, plot_type, city, trend_direction, trend_slope)
                     if selected_years:
                         visualize_temperature_by_year(city, combined_data, selected_years)
 
