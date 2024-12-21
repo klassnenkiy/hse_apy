@@ -5,6 +5,7 @@ import requests
 import aiohttp
 import asyncio
 from sklearn.linear_model import LinearRegression
+from concurrent.futures import ThreadPoolExecutor
 
 
 def get_current_temperature_sync(city, api_key):
@@ -45,8 +46,6 @@ def clean_and_convert_data(city_data):
 
 def analyze_city_data(city_data):
     city_data = clean_and_convert_data(city_data)
-    city_data['anomaly'] = ((city_data['temperature'] > city_data['rolling_mean'] + 2 * city_data['rolling_std']) |
-                            (city_data['temperature'] < city_data['rolling_mean'] - 2 * city_data['rolling_std']))
     season_stats = city_data.groupby('season')['temperature'].agg(['mean', 'std']).reset_index()
     city_data['timestamp_numeric'] = (city_data['timestamp'] - city_data['timestamp'].min()).dt.total_seconds()
     X = city_data['timestamp_numeric'].values.reshape(-1, 1)
@@ -54,11 +53,13 @@ def analyze_city_data(city_data):
     model = LinearRegression()
     model.fit(X, y)
     trend_slope = model.coef_[0]
-
+    city_data['anomaly'] = ((city_data['temperature'] > city_data['rolling_mean'] + 2 * city_data['rolling_std']) |
+                            (city_data['temperature'] < city_data['rolling_mean'] - 2 * city_data['rolling_std']))
+    anomalies = city_data[city_data['anomaly'] == True]
     return {
         'season_stats': season_stats,
         'trend_slope': trend_slope,
-        'anomalies': city_data[city_data['anomaly'] == True]
+        'anomalies': anomalies
     }
 
 
@@ -87,7 +88,6 @@ def visualize_temperature(data, season_stats, anomalies):
 def compare_temperature(city, data, api_key):
     city_data = data[data['city'] == city]
 
-
     if not api_key:
         st.warning("API-ключ не введен. Данные о текущей температуре не будут отображены.")
         return
@@ -99,6 +99,15 @@ def compare_temperature(city, data, api_key):
     analysis = analyze_city_data(city_data)
     season_stats = analysis['season_stats']
     anomalies = analysis['anomalies']
+
+    season_mean = season_stats.loc[season_stats['season'] == 'summer', 'mean'].values[0]
+    season_std = season_stats.loc[season_stats['season'] == 'summer', 'std'].values[0]
+
+    if current_temp_sync:
+        if current_temp_sync > (season_mean + 2 * season_std) or current_temp_sync < (season_mean - 2 * season_std):
+            st.write(f"Текущая температура аномальна для сезона.")
+        else:
+            st.write(f"Текущая температура в пределах нормы для сезона.")
 
     visualize_temperature(city_data, season_stats, anomalies)
 
