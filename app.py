@@ -92,8 +92,7 @@ def analyze_city_data(city_data, sensitivity=2.0):
             'year': year,
             'slope': model.coef_[0],
             'intercept': model.intercept_,
-            'trend_direction': "положительный" if model.coef_[0] > 0 else "отрицательный" if model.coef_[
-                                                                                                 0] < 0 else "плоский"
+            'trend_direction': "положительный" if model.coef_[0] > 0 else "отрицательный" if model.coef_[0] < 0 else "плоский"
         })
 
     trend_per_year = pd.DataFrame(trend_per_year).sort_values(by='year')
@@ -101,9 +100,13 @@ def analyze_city_data(city_data, sensitivity=2.0):
     X = city_data['timestamp_numeric'].values.reshape(-1, 1)
     y = city_data['temperature'].values
     model = LinearRegression()
-    model.fit(X, y)
-    overall_trend_slope = model.coef_[0]
-    overall_trend_direction = "положительный" if overall_trend_slope > 0 else "отрицательный" if overall_trend_slope < 0 else "плоский"
+    if len(X) > 1:
+        model.fit(X, y)
+        overall_trend_slope = model.coef_[0]
+        overall_trend_direction = "положительный" if overall_trend_slope > 0 else "отрицательный" if overall_trend_slope < 0 else "плоский"
+    else:
+        overall_trend_slope = None
+        overall_trend_direction = "неопределено"
 
     return {
         'season_stats': season_stats,
@@ -112,6 +115,7 @@ def analyze_city_data(city_data, sensitivity=2.0):
         'overall_trend_direction': overall_trend_direction,
         'anomalies': city_data[city_data['anomaly'] == True]
     }
+
 
 
 def get_temperature_color(temp):
@@ -289,9 +293,10 @@ def main():
             analysis = analyze_city_data(filtered_data, sensitivity)
             season_stats = analysis['season_stats']
             anomalies = analysis['anomalies']
-            trend_direction = analysis['trend_direction']
-            trend_slope = analysis['trend_slope']
-            visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction, trend_slope)
+            trend_direction = analysis.get('overall_trend_direction', 'неопределено')  # Safe access
+            trend_slope = analysis.get('overall_trend_slope', None)  # Safe access
+            visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction,
+                                  trend_slope)
             if selected_years:
                 visualize_temperature_by_year(selected_city, filtered_data, selected_years)
 
