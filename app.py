@@ -60,6 +60,7 @@ async def get_current_temperature_async(city, api_key):
                 st.error(f"Ошибка при получении данных для {city}: {response.status}")
                 return None
 
+
 def clean_and_convert_data(city_data):
     city_data['temperature'] = pd.to_numeric(city_data['temperature'], errors='coerce')
     city_data['timestamp'] = pd.to_datetime(city_data['timestamp'], errors='coerce')
