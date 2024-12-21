@@ -34,6 +34,7 @@ month_to_season = {12: "winter", 1: "winter", 2: "winter",
                    6: "summer", 7: "summer", 8: "summer",
                    9: "autumn", 10: "autumn", 11: "autumn"}
 
+
 def generate_realistic_temperature_data(city, num_years=10):
     dates = pd.date_range(start="2010-01-01", periods=365 * num_years, freq="D")
     data = []
@@ -44,6 +45,7 @@ def generate_realistic_temperature_data(city, num_years=10):
         data.append({"city": city, "timestamp": date, "temperature": temperature, "season": season})
     df = pd.DataFrame(data)
     return df
+
 
 @cached(ttl=60, serializer=JsonSerializer())
 async def get_current_temperature_async(city, api_key):
@@ -69,6 +71,7 @@ def clean_and_convert_data(city_data):
     city_data.dropna(subset=['temperature', 'rolling_mean', 'rolling_std'], inplace=True)
     return city_data
 
+
 def analyze_city_data(city_data, sensitivity=2.0):
     city_data = clean_and_convert_data(city_data)
     city_data['anomaly'] = (
@@ -87,6 +90,7 @@ def analyze_city_data(city_data, sensitivity=2.0):
         'anomalies': city_data[city_data['anomaly'] == True]
     }
 
+
 def get_temperature_color(temp):
     if temp > 30:
         return 'red'
@@ -94,6 +98,7 @@ def get_temperature_color(temp):
         return 'blue'
     else:
         return 'green'
+
 
 def get_temperature_emoji(temp):
     if temp > 30:
@@ -103,12 +108,14 @@ def get_temperature_emoji(temp):
     else:
         return "☀️"
 
+
 def display_temperature_data(temperatures):
     st.subheader("Текущие температуры")
     df = pd.DataFrame(list(temperatures.items()), columns=["Город", "Температура"])
     df['Эмодзи'] = df['Температура'].apply(lambda x: get_temperature_emoji(x))
     df['Цвет'] = df['Температура'].apply(lambda x: get_temperature_color(x))
     st.table(df[['Город', 'Температура', 'Эмодзи']])
+
 
 def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=None):
     st.subheader(f"Температура в {city}")
@@ -133,6 +140,7 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=
                         marker=dict(color='red', size=8), name="Аномалии")
     st.plotly_chart(fig)
 
+
 def visualize_temperature_by_year(city, plot_data, selected_years):
     city_data = plot_data[plot_data['city'] == city].copy()
     city_data['year'] = city_data['timestamp'].dt.year
@@ -147,11 +155,13 @@ def visualize_temperature_by_year(city, plot_data, selected_years):
     )
     st.plotly_chart(fig)
 
+
 def generate_excel_report(data):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         data.to_excel(writer, sheet_name="Temperature Data")
     return output.getvalue()
+
 
 def get_temperatures_for_multiple_cities_parallel(cities, api_key):
     temperatures = {}
@@ -167,6 +177,7 @@ def get_temperatures_for_multiple_cities_parallel(cities, api_key):
                 st.error(f"Ошибка при получении данных для {city}: {e}")
     return temperatures
 
+
 def get_current_temperature_sync(city, api_key):
     url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
     response = requests.get(url)
@@ -179,6 +190,7 @@ def get_current_temperature_sync(city, api_key):
     else:
         st.error(f"Ошибка при получении данных для {city}: {response.status_code}")
         return None
+
 
 def main():
     st.sidebar.title("Мониторинг температуры")
@@ -200,6 +212,7 @@ def main():
     with st.expander(f"Исторические данные для города {selected_city}", expanded=True):
         st.dataframe(filtered_data)
     method = st.sidebar.radio("Выберите метод получения температуры", ("Синхронный", "Параллельный"))
+
     if method == "Параллельный":
         if uploaded_file is not None and api_key:
             cities_selected = st.sidebar.multiselect("Выберите города для параллельных запросов", cities)
@@ -224,6 +237,7 @@ def main():
                     visualize_temperature(city_data, city_season_stats, city_anomalies, plot_type, city)
                     if selected_years:
                         visualize_temperature_by_year(city, combined_data, selected_years)
+
     if uploaded_file is not None and api_key:
         if method == "Синхронный":
             start_time = time.time()
@@ -234,16 +248,21 @@ def main():
                 st.write(f"Текущая температура в {selected_city}: {current_temp}°C")
                 current_season = month_to_season[pd.to_datetime('today').month]
                 normal_temp = seasonal_temperatures[selected_city][current_season]
-                if abs(current_temp - normal_temp) > 5:
-                    st.warning(f"Текущая температура в {selected_city} отклоняется от нормы для сезона {current_season}.")
+                season_data = filtered_data[filtered_data['season'] == current_season]
+                std_dev = season_data['temperature'].std()
+                if abs(current_temp - normal_temp) > sensitivity * std_dev:
+                    st.warning(
+                        f"Текущая температура в {selected_city} отклоняется от нормы для сезона {current_season}.")
                 else:
-                    st.success(f"Текущая температура в {selected_city} соответствует нормам для сезона {current_season}.")
+                    st.success(
+                        f"Текущая температура в {selected_city} соответствует нормам для сезона {current_season}.")
             analysis = analyze_city_data(filtered_data, sensitivity)
             season_stats = analysis['season_stats']
             anomalies = analysis['anomalies']
             visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city)
             if selected_years:
                 visualize_temperature_by_year(selected_city, filtered_data, selected_years)
+
         st.sidebar.subheader("Дополнительные возможности")
         st.sidebar.write("1. Выбор различных типов графиков (линейный, столбчатый)")
         st.sidebar.write("2. Настройка чувствительности для выявления аномалий")
@@ -252,6 +271,7 @@ def main():
         st.sidebar.write("5. Кэширование")
         st.sidebar.download_button("Скачать отчет (Excel)", generate_excel_report(data),
                                    file_name="temperature_report.xlsx")
+
 
 if __name__ == "__main__":
     main()
