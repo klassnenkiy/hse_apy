@@ -77,22 +77,41 @@ def analyze_city_data(city_data, sensitivity=2.0):
     city_data['anomaly'] = (
             (city_data['temperature'] > city_data['rolling_mean'] + sensitivity * city_data['rolling_std']) |
             (city_data['temperature'] < city_data['rolling_mean'] - sensitivity * city_data['rolling_std']))
+
     season_stats = city_data.groupby('season')['temperature'].agg(['mean', 'std', 'min', 'max']).reset_index()
+    city_data['year'] = city_data['timestamp'].dt.year
+    trend_per_year = []
+    for year, group in city_data.groupby('year'):
+        group['timestamp_numeric'] = (group['timestamp'] - group['timestamp'].min()).dt.total_seconds()
+        X = group['timestamp_numeric'].values.reshape(-1, 1)
+        y = group['temperature'].values
+        model = LinearRegression()
+        model.fit(X, y)
+
+        trend_per_year.append({
+            'year': year,
+            'slope': model.coef_[0],
+            'intercept': model.intercept_,
+            'trend_direction': "положительный" if model.coef_[0] > 0 else "отрицательный" if model.coef_[
+                                                                                                 0] < 0 else "плоский"
+        })
+
+    trend_per_year = pd.DataFrame(trend_per_year).sort_values(by='year')
     city_data['timestamp_numeric'] = (city_data['timestamp'] - city_data['timestamp'].min()).dt.total_seconds()
     X = city_data['timestamp_numeric'].values.reshape(-1, 1)
     y = city_data['temperature'].values
     model = LinearRegression()
     model.fit(X, y)
-    trend_slope = model.coef_[0]
-    trend_direction = "положительный" if trend_slope > 0 else "отрицательный" if trend_slope < 0 else "плоский"
+    overall_trend_slope = model.coef_[0]
+    overall_trend_direction = "положительный" if overall_trend_slope > 0 else "отрицательный" if overall_trend_slope < 0 else "плоский"
 
     return {
         'season_stats': season_stats,
-        'trend_slope': trend_slope,
-        'trend_direction': trend_direction,
+        'trend_per_year': trend_per_year,
+        'overall_trend_slope': overall_trend_slope,
+        'overall_trend_direction': overall_trend_direction,
         'anomalies': city_data[city_data['anomaly'] == True]
     }
-
 
 
 def get_temperature_color(temp):
