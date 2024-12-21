@@ -7,7 +7,6 @@ import aiohttp
 import asyncio
 from sklearn.linear_model import LinearRegression
 
-
 seasonal_temperatures = {
     "New York": {"winter": 0, "spring": 10, "summer": 25, "autumn": 15},
     "London": {"winter": 5, "spring": 11, "summer": 18, "autumn": 12},
@@ -119,15 +118,25 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line'):
 
     if plot_type == 'line':
         fig = px.line(data, x='timestamp', y='temperature', title="Температура")
-        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'), name="Аномалии")
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'),
+                        name="Аномалии")
     elif plot_type == 'bar':
         fig = px.bar(data, x='timestamp', y='temperature', title="Температура")
-        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'), name="Аномалии")
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'),
+                        name="Аномалии")
 
     st.plotly_chart(fig)
 
 
-def compare_temperature(city, data, api_key, plot_type):
+async def compare_multiple_temperatures(cities, data, api_key, plot_type):
+    tasks = []
+    for city in cities:
+        tasks.append(analyze_and_plot_for_city(city, data, api_key, plot_type))
+
+    await asyncio.gather(*tasks)
+
+
+async def analyze_and_plot_for_city(city, data, api_key, plot_type):
     city_data = data[data['city'] == city]
 
     if not api_key:
@@ -166,14 +175,16 @@ def main():
     if uploaded_file is not None and api_key:
         filtered_data = generate_realistic_temperature_data(selected_cities)
 
-        selected_city = st.sidebar.selectbox("Выберите город для анализа", selected_cities)
-        compare_temperature(selected_city, filtered_data, api_key, plot_type)
+        if len(selected_cities) == 1:
+            selected_city = selected_cities[0]
+            compare_temperature(selected_city, filtered_data, api_key, plot_type)
+        else:
+            st.sidebar.subheader("Параллельный анализ всех выбранных городов")
+            asyncio.run(compare_multiple_temperatures(selected_cities, filtered_data, api_key, plot_type))
 
     st.sidebar.subheader("Дополнительные возможности")
     st.sidebar.write("1. Параллельный анализ всех выбранных городов")
     st.sidebar.write("2. Выбор различных типов графиков (линейный, столбчатый)")
-
-    st.sidebar.button("Выполнить параллельный анализ")
 
 
 if __name__ == "__main__":
