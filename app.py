@@ -7,7 +7,6 @@ import aiohttp
 import asyncio
 from sklearn.linear_model import LinearRegression
 
-
 seasonal_temperatures = {
     "New York": {"winter": 0, "spring": 10, "summer": 25, "autumn": 15},
     "London": {"winter": 5, "spring": 11, "summer": 18, "autumn": 12},
@@ -103,41 +102,40 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line'):
     fig = None
 
     if plot_type == 'line':
-        fig = px.line(data, x='timestamp', y='temperature', title="Температура")
-        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red', size=10), name="Аномалии")
+        fig = px.line(data, x='timestamp', y='temperature', title="Температура", color='city')
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'),
+                        name="Аномалии")
     elif plot_type == 'bar':
-        fig = px.bar(data, x='timestamp', y='temperature', title="Температура")
-        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red', size=10), name="Аномалии")
+        fig = px.bar(data, x='timestamp', y='temperature', title="Температура", color='city')
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'),
+                        name="Аномалии")
 
     st.plotly_chart(fig)
 
 
+def compare_temperature(cities, data, api_key, plot_type):
+    all_anomalies = []
+    all_season_stats = pd.DataFrame()
+    for city in cities:
+        city_data = data[data['city'] == city]
 
-async def compare_temperature(city, data, api_key, plot_type):
-    city_data = data[data['city'] == city]
+        if not api_key:
+            st.warning("API-ключ не введен. Данные о текущей температуре не будут отображены.")
+            continue
 
-    if not api_key:
-        st.warning("API-ключ не введен. Данные о текущей температуре не будут отображены.")
-        return
+        current_temp_sync = get_current_temperature_sync(city, api_key)
+        if current_temp_sync is not None:
+            st.write(f"Текущая температура в {city}: {current_temp_sync}°C")
 
-    current_temp_async = await get_current_temperature_async(city, api_key)
-    if current_temp_async is not None:
-        st.write(f"Текущая температура в {city}: {current_temp_async}°C")
+        analysis = analyze_city_data(city_data)
+        season_stats = analysis['season_stats']
+        anomalies = analysis['anomalies']
 
-    analysis = analyze_city_data(city_data)
-    season_stats = analysis['season_stats']
-    anomalies = analysis['anomalies']
+        all_season_stats = pd.concat([all_season_stats, season_stats])
+        all_anomalies.append(anomalies)
 
-    visualize_temperature(city_data, season_stats, anomalies, plot_type)
-
-
-async def parallel_analysis(selected_cities, filtered_data, api_key, plot_type):
-    tasks = []
-    for city in selected_cities:
-        task = asyncio.ensure_future(compare_temperature(city, filtered_data, api_key, plot_type))
-        tasks.append(task)
-
-    await asyncio.gather(*tasks)
+    all_anomalies = pd.concat(all_anomalies)
+    visualize_temperature(data, all_season_stats, all_anomalies, plot_type)
 
 
 def main():
@@ -151,22 +149,24 @@ def main():
         st.sidebar.warning("Пожалуйста, загрузите файл с данными.")
 
     cities = list(seasonal_temperatures.keys())
+
     selected_cities = st.sidebar.multiselect("Выберите города", cities, default=cities)
 
     api_key = st.sidebar.text_input("Введите API-ключ для OpenWeatherMap")
+
     plot_type = st.sidebar.radio("Выберите тип графика", ('line', 'bar'))
 
     if uploaded_file is not None and api_key:
         filtered_data = generate_realistic_temperature_data(selected_cities)
 
-        if selected_cities:
-            asyncio.run(parallel_analysis(selected_cities, filtered_data, api_key, plot_type))
+        compare_temperature(selected_cities, filtered_data, api_key, plot_type)
 
     st.sidebar.subheader("Дополнительные возможности")
     st.sidebar.write("1. Параллельный анализ всех выбранных городов")
     st.sidebar.write("2. Выбор различных типов графиков (линейный, столбчатый)")
 
     st.sidebar.button("Выполнить параллельный анализ")
+
 
 if __name__ == "__main__":
     main()
