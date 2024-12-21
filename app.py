@@ -250,7 +250,7 @@ def main():
                 normal_temp = seasonal_temperatures[selected_city][current_season]
                 season_data = filtered_data[filtered_data['season'] == current_season]
                 std_dev = season_data['temperature'].std()
-                if abs(current_temp - normal_temp) > sensitivity * std_dev:
+                if abs(current_temp - normal_temp) > 2 * std_dev:
                     st.warning(
                         f"Текущая температура в {selected_city} отклоняется от нормы для сезона {current_season}.")
                 else:
