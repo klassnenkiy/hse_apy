@@ -5,3 +5,5 @@ aiohttp
 matplotlib
 scikit-learn
 plotly
+xlsxwriter
+aiocache
