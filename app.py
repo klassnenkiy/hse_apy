@@ -46,33 +46,6 @@ def generate_realistic_temperature_data(cities, num_years=10):
     return df
 
 
-def get_current_temperature_sync(city, api_key):
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        data = response.json()
-        return data['main']['temp']
-    elif response.status_code == 401:
-        st.error("Error 401: Unauthorized. Please check your API key.")
-        return None
-    else:
-        st.error(f"Error fetching data: {response.status_code}")
-        return None
-
-
-async def get_current_temperature_async(city, api_key):
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            if response.status == 200:
-                data = await response.json()
-                return data['main']['temp']
-            else:
-                st.error(f"Error fetching data: {response.status}")
-                return None
-
-
 def clean_and_convert_data(city_data):
     city_data['temperature'] = pd.to_numeric(city_data['temperature'], errors='coerce')
     city_data['timestamp'] = pd.to_datetime(city_data['timestamp'], errors='coerce')
@@ -114,6 +87,12 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line'):
     st.subheader("Сезонный профиль")
     st.write(season_stats)
 
+    # Проверим, что данные не пустые
+    if data.empty:
+        st.error("Нет данных для отображения.")
+        return
+
+    # Создание графика
     fig = None
 
     if plot_type == 'line':
@@ -125,7 +104,9 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line'):
         fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'),
                         name="Аномалии")
 
-    st.plotly_chart(fig)
+    # Если график был создан, отобразим его
+    if fig is not None:
+        st.plotly_chart(fig)
 
 
 async def compare_multiple_temperatures(cities, data, api_key, plot_type):
