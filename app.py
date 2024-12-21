@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import streamlit as st
 import requests
@@ -6,6 +7,45 @@ import aiohttp
 import asyncio
 from sklearn.linear_model import LinearRegression
 from concurrent.futures import ThreadPoolExecutor
+
+
+seasonal_temperatures = {
+    "New York": {"winter": 0, "spring": 10, "summer": 25, "autumn": 15},
+    "London": {"winter": 5, "spring": 11, "summer": 18, "autumn": 12},
+    "Paris": {"winter": 4, "spring": 12, "summer": 20, "autumn": 13},
+    "Tokyo": {"winter": 6, "spring": 15, "summer": 27, "autumn": 18},
+    "Moscow": {"winter": -10, "spring": 5, "summer": 18, "autumn": 8},
+    "Sydney": {"winter": 12, "spring": 18, "summer": 25, "autumn": 20},
+    "Berlin": {"winter": 0, "spring": 10, "summer": 20, "autumn": 11},
+    "Beijing": {"winter": -2, "spring": 13, "summer": 27, "autumn": 16},
+    "Rio de Janeiro": {"winter": 20, "spring": 25, "summer": 30, "autumn": 25},
+    "Dubai": {"winter": 20, "spring": 30, "summer": 40, "autumn": 30},
+    "Los Angeles": {"winter": 15, "spring": 18, "summer": 25, "autumn": 20},
+    "Singapore": {"winter": 27, "spring": 28, "summer": 28, "autumn": 27},
+    "Mumbai": {"winter": 25, "spring": 30, "summer": 35, "autumn": 30},
+    "Cairo": {"winter": 15, "spring": 25, "summer": 35, "autumn": 25},
+    "Mexico City": {"winter": 12, "spring": 18, "summer": 20, "autumn": 15},
+}
+
+month_to_season = {12: "winter", 1: "winter", 2: "winter",
+                   3: "spring", 4: "spring", 5: "spring",
+                   6: "summer", 7: "summer", 8: "summer",
+                   9: "autumn", 10: "autumn", 11: "autumn"}
+
+
+def generate_realistic_temperature_data(cities, num_years=10):
+    dates = pd.date_range(start="2010-01-01", periods=365 * num_years, freq="D")
+    data = []
+
+    for city in cities:
+        for date in dates:
+            season = month_to_season[date.month]
+            mean_temp = seasonal_temperatures[city][season]
+            temperature = np.random.normal(loc=mean_temp, scale=5)
+            data.append({"city": city, "timestamp": date, "temperature": temperature, "season": season})
+
+    df = pd.DataFrame(data)
+    return df
 
 
 def get_current_temperature_sync(city, api_key):
@@ -46,6 +86,8 @@ def clean_and_convert_data(city_data):
 
 def analyze_city_data(city_data):
     city_data = clean_and_convert_data(city_data)
+    city_data['anomaly'] = ((city_data['temperature'] > city_data['rolling_mean'] + 2 * city_data['rolling_std']) |
+                            (city_data['temperature'] < city_data['rolling_mean'] - 2 * city_data['rolling_std']))
     season_stats = city_data.groupby('season')['temperature'].agg(['mean', 'std']).reset_index()
     city_data['timestamp_numeric'] = (city_data['timestamp'] - city_data['timestamp'].min()).dt.total_seconds()
     X = city_data['timestamp_numeric'].values.reshape(-1, 1)
@@ -53,13 +95,11 @@ def analyze_city_data(city_data):
     model = LinearRegression()
     model.fit(X, y)
     trend_slope = model.coef_[0]
-    city_data['anomaly'] = ((city_data['temperature'] > city_data['rolling_mean'] + 2 * city_data['rolling_std']) |
-                            (city_data['temperature'] < city_data['rolling_mean'] - 2 * city_data['rolling_std']))
-    anomalies = city_data[city_data['anomaly'] == True]
+
     return {
         'season_stats': season_stats,
         'trend_slope': trend_slope,
-        'anomalies': anomalies
+        'anomalies': city_data[city_data['anomaly'] == True]
     }
 
 
@@ -100,16 +140,8 @@ def compare_temperature(city, data, api_key):
     season_stats = analysis['season_stats']
     anomalies = analysis['anomalies']
 
-    season_mean = season_stats.loc[season_stats['season'] == 'summer', 'mean'].values[0]
-    season_std = season_stats.loc[season_stats['season'] == 'summer', 'std'].values[0]
-
-    if current_temp_sync:
-        if current_temp_sync > (season_mean + 2 * season_std) or current_temp_sync < (season_mean - 2 * season_std):
-            st.write(f"Текущая температура аномальна для сезона.")
-        else:
-            st.write(f"Текущая температура в пределах нормы для сезона.")
-
     visualize_temperature(city_data, season_stats, anomalies)
+
 
 def main():
     st.sidebar.title("Мониторинг температуры")
@@ -121,12 +153,23 @@ def main():
     else:
         st.sidebar.warning("Пожалуйста, загрузите файл с данными.")
 
-    selected_city = st.sidebar.selectbox("Выберите город", ['Berlin', 'Moscow', 'Cairo', 'Dubai'])
+    cities = list(seasonal_temperatures.keys())
+
+    selected_cities = st.sidebar.multiselect("Выберите города", cities, default=cities)
 
     api_key = st.sidebar.text_input("Введите API-ключ для OpenWeatherMap")
 
     if uploaded_file is not None and api_key:
-        compare_temperature(selected_city, data, api_key)
+        filtered_data = generate_realistic_temperature_data(selected_cities)
+
+        selected_city = st.sidebar.selectbox("Выберите город для анализа", selected_cities)
+        compare_temperature(selected_city, filtered_data, api_key)
+
+    st.sidebar.subheader("Дополнительные возможности")
+    st.sidebar.write("1. Параллельный анализ всех выбранных городов")
+    st.sidebar.write("2. Выбор различных типов графиков (линейный, столбчатый)")
+
+    st.sidebar.button("Выполнить параллельный анализ")
 
 
 if __name__ == "__main__":
