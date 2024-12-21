@@ -119,10 +119,10 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line'):
 
     if plot_type == 'line':
         ax.plot(data['timestamp'], data['temperature'], label='Температура')
+        ax.scatter(anomalies['timestamp'], anomalies['temperature'], color='red', label='Аномалии')
     elif plot_type == 'bar':
         ax.bar(data['timestamp'], data['temperature'], label='Температура')
 
-    ax.scatter(anomalies['timestamp'], anomalies['temperature'], color='red', label='Аномалии')
     ax.set_xlabel("Дата")
     ax.set_ylabel("Температура (°C)")
     ax.legend()
