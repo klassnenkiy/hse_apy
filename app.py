@@ -193,7 +193,6 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=
     st.subheader("Сезонный профиль")
     st.write(season_stats)
 
-    # Визуализация трендов по сезонам
     if trend_per_season is not None:
         st.subheader("Тренды по сезонам")
         for idx, row in trend_per_season.iterrows():
@@ -260,25 +259,31 @@ def main():
     else:
         data = None
         selected_years = None
+
     cities = list(seasonal_temperatures.keys())
     selected_city = st.sidebar.selectbox("Выберите город", cities)
     api_key = st.sidebar.text_input("Введите API-ключ для OpenWeatherMap")
     plot_type = st.sidebar.radio("Выберите тип графика", ('line', 'bar'))
     sensitivity = st.sidebar.slider("Чувствительность для аномалий (множитель стандартного отклонения)", 1.0, 3.0, 2.0)
+
     filtered_data = generate_realistic_temperature_data(selected_city)
+
     analysis = analyze_city_data(filtered_data, sensitivity)
     season_stats = analysis['season_stats']
     anomalies = analysis['anomalies']
     trend_direction = analysis.get('overall_trend_direction', 'неопределено')
     trend_slope = analysis.get('overall_trend_slope', None)
     trend_per_season = analysis['trend_per_season']
-    visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction, trend_slope, trend_per_season)
+
+    visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction,
+                          trend_slope, trend_per_season)
 
     if selected_years:
         visualize_temperature_by_year(selected_city, filtered_data, selected_years)
 
     with st.expander(f"Исторические данные для города {selected_city}", expanded=True):
         st.dataframe(filtered_data)
+
     method = st.sidebar.radio("Выберите метод получения температуры", ("Синхронный", "Параллельный"))
 
     if method == "Параллельный":
@@ -291,20 +296,24 @@ def main():
                 st.write(f"Время выполнения параллельных запросов: {end_time - start_time:.2f} секунд")
                 st.write(temperatures)
                 display_temperature_data(temperatures)
+
                 all_data = []
                 for city in cities_selected:
                     city_data = generate_realistic_temperature_data(city)
                     all_data.append(city_data)
                 combined_data = pd.concat(all_data)
+
                 season_stats = analyze_city_data(combined_data, sensitivity)['season_stats']
                 anomalies = analyze_city_data(combined_data, sensitivity)['anomalies']
                 trend_slope = analyze_city_data(combined_data, sensitivity)['overall_trend_slope']
                 trend_direction = analyze_city_data(combined_data, sensitivity)['overall_trend_direction']
+
                 for city in cities_selected:
                     city_data = combined_data[combined_data['city'] == city]
                     city_season_stats = season_stats[season_stats['season'].isin(city_data['season'].unique())]
                     city_anomalies = anomalies[anomalies['city'] == city]
-                    visualize_temperature(city_data, city_season_stats, city_anomalies, plot_type, city, trend_direction, trend_slope)
+                    visualize_temperature(city_data, city_season_stats, city_anomalies, plot_type, city,
+                                          trend_direction, trend_slope)
                     if selected_years:
                         visualize_temperature_by_year(city, combined_data, selected_years)
 
@@ -326,25 +335,22 @@ def main():
                 else:
                     st.success(
                         f"Текущая температура в {selected_city} соответствует нормам для сезона {current_season}.")
-            analysis = analyze_city_data(filtered_data, sensitivity)
-            season_stats = analysis['season_stats']
-            anomalies = analysis['anomalies']
-            trend_direction = analysis.get('overall_trend_direction', 'неопределено')  # Safe access
-            trend_slope = analysis.get('overall_trend_slope', None)  # Safe access
+
             visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction,
                                   trend_slope)
             if selected_years:
                 visualize_temperature_by_year(selected_city, filtered_data, selected_years)
 
-        st.sidebar.subheader("Дополнительные возможности")
-        st.sidebar.write("1. Выбор различных типов графиков (линейный, столбчатый)")
-        st.sidebar.write("2. Настройка чувствительности для выявления аномалий")
-        st.sidebar.write("3. Сравнение температур по нескольким городам")
-        st.sidebar.write("4. Возможность скачивания отчета в Excel")
-        st.sidebar.write("5. Кэширование")
-        st.sidebar.download_button("Скачать отчет (Excel)", generate_excel_report(data),
-                                   file_name="temperature_report.xlsx")
+    st.sidebar.subheader("Дополнительные возможности")
+    st.sidebar.write("1. Выбор различных типов графиков (линейный, столбчатый)")
+    st.sidebar.write("2. Настройка чувствительности для выявления аномалий")
+    st.sidebar.write("3. Сравнение температур по нескольким городам")
+    st.sidebar.write("4. Возможность скачивания отчета в Excel")
+    st.sidebar.write("5. Кэширование")
+    st.sidebar.download_button("Скачать отчет (Excel)", generate_excel_report(data),
+                               file_name="temperature_report.xlsx")
 
 
 if __name__ == "__main__":
     main()
+
