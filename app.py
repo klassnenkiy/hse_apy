@@ -12,11 +12,11 @@ from aiocache.serializers import JsonSerializer
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 seasonal_temperatures = {
+    "Moscow": {"winter": -10, "spring": 5, "summer": 18, "autumn": 8},
     "New York": {"winter": 0, "spring": 10, "summer": 25, "autumn": 15},
     "London": {"winter": 5, "spring": 11, "summer": 18, "autumn": 12},
     "Paris": {"winter": 4, "spring": 12, "summer": 20, "autumn": 13},
     "Tokyo": {"winter": 6, "spring": 15, "summer": 27, "autumn": 18},
-    "Moscow": {"winter": -10, "spring": 5, "summer": 18, "autumn": 8},
     "Sydney": {"winter": 12, "spring": 18, "summer": 25, "autumn": 20},
     "Berlin": {"winter": 0, "spring": 10, "summer": 20, "autumn": 11},
     "Beijing": {"winter": -2, "spring": 13, "summer": 27, "autumn": 16},
