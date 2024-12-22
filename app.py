@@ -249,7 +249,6 @@ def get_current_temperature_sync(city, api_key):
         st.error(f"Ошибка при получении данных для {city}: {response.status_code}")
         return None
 
-
 def main():
     st.sidebar.title("Мониторинг температуры")
     uploaded_file = st.sidebar.file_uploader("Загрузите файл с данными", type=["csv"])
