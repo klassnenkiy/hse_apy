@@ -152,10 +152,12 @@ def get_temperature_emoji(temp):
 
 
 def display_temperature_data(temperatures):
-    st.subheader("Текущие температуры")
+    st.subheader("Текущие температуры по городам")
     df = pd.DataFrame(list(temperatures.items()), columns=["Город", "Температура"])
     df['Эмодзи'] = df['Температура'].apply(lambda x: get_temperature_emoji(x))
     df['Цвет'] = df['Температура'].apply(lambda x: get_temperature_color(x))
+
+    st.write("**Текущие температуры** по выбранным городам:")
     st.table(df[['Город', 'Температура', 'Эмодзи']])
 
 
@@ -172,7 +174,31 @@ def visualize_temperature_by_year(city, plot_data, selected_years):
         yaxis_title='Temperature (°C)',
         template='plotly_white'
     )
+
+    for year in selected_years:
+        year_data = city_data_filtered[city_data_filtered['year'] == year]
+        year_data['timestamp_numeric'] = (year_data['timestamp'] - year_data['timestamp'].min()).dt.total_seconds()
+
+        X = year_data['timestamp_numeric'].values.reshape(-1, 1)
+        y = year_data['temperature'].values
+        model = LinearRegression()
+        model.fit(X, y)
+
+        trend_slope = model.coef_[0]
+        trend_intercept = model.intercept_
+
+        year_data['trend'] = model.predict(X)
+
+        fig.add_scatter(
+            x=year_data['day_of_year'],
+            y=year_data['trend'],
+            mode='lines',
+            line=dict(color='black', dash='dash'),
+            name=f"Тренд {year}"
+        )
+
     st.plotly_chart(fig)
+
 
 
 def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=None, trend_direction=None,
@@ -180,14 +206,24 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=
     mean_temp = season_stats['mean'].mean()
     min_temp = season_stats['min'].min()
     max_temp = season_stats['max'].max()
-    st.write(f"Средняя температура: {mean_temp:.2f}°C")
-    st.write(f"Минимальная температура: {min_temp:.2f}°C")
-    st.write(f"Максимальная температура: {max_temp:.2f}°C")
-    if trend_direction is not None and trend_slope is not None:
-        st.write(f"Общий тренд: {trend_direction}")
 
-    st.subheader("Сезонный профиль")
+    st.write(f"Средняя температура: **{mean_temp:.2f}°C**")
+    st.write(f"Минимальная температура: **{min_temp:.2f}°C**")
+    st.write(f"Максимальная температура: **{max_temp:.2f}°C**")
+
+    if trend_direction is not None and trend_slope is not None:
+        st.write(f"Общий тренд: _{trend_direction}_")
+
+    st.subheader(f"Сезонный профиль для города {city}")
     st.write(season_stats)
+
+    # Выделим аномалии, если они есть
+    if not anomalies.empty:
+        st.markdown("### 🚨 **Аномалии температуры** 🚨")
+        st.write(anomalies)
+    else:
+        st.markdown("### 🔍 **Нет аномалий температуры** 🔍")
+
     fig = None
     if plot_type == 'line':
         fig = px.line(data, x='timestamp', y='temperature', title=f"Температура в {city}")
@@ -199,19 +235,22 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=
         fig.update_traces(marker=dict(line=dict(width=0)))
         fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers',
                         marker=dict(color='red', size=8), name="Аномалии")
+
     plot_key = f"{city}_{plot_type}_temperature_plot_{int(time.time())}"
     st.plotly_chart(fig, key=plot_key)
+
     if trend_per_season is not None:
         st.subheader("Тренды по сезонам")
         if isinstance(trend_per_season, pd.DataFrame):
             for idx, row in trend_per_season.iterrows():
-                st.write(f"Сезон {row['season']}: Тренд {row['trend_direction']}")
+                st.write(f"Сезон _{row['season']}_ : Тренд **{row['trend_direction']}**")
         else:
             st.warning("Нет данных о тренде по сезонам.")
+
     st.subheader("Тренды по годам")
     trend_per_year = analyze_city_data(data)['trend_per_year']
     for index, row in trend_per_year.iterrows():
-        st.write(f"Год {row['year']}: Тренд {row['trend_direction']}")
+        st.write(f"Год **{row['year']}**: Тренд _{row['trend_direction']}_")
 
 
 def generate_excel_report(data):
@@ -275,8 +314,8 @@ def main():
                 temperatures = get_temperatures_for_multiple_cities_parallel(cities_selected, api_key)
                 end_time = time.time()
                 st.write(f"Время выполнения параллельных запросов: {end_time - start_time:.2f} секунд")
-                st.write(temperatures)
                 display_temperature_data(temperatures)
+                st.write(temperatures)
                 all_data = []
                 for city in cities_selected:
                     city_data = generate_realistic_temperature_data(city)
@@ -289,6 +328,7 @@ def main():
                 analysis = analyze_city_data(filtered_data, sensitivity)
                 trend_per_season = analysis['trend_per_season']
                 for city in cities_selected:
+                    st.subheader(f"Температура в городе {city}")
                     city_data = combined_data[combined_data['city'] == city]
                     city_season_stats = season_stats[season_stats['season'].isin(city_data['season'].unique())]
                     city_anomalies = anomalies[anomalies['city'] == city]
