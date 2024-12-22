@@ -175,7 +175,7 @@ def visualize_temperature_by_year(city, plot_data, selected_years):
     st.plotly_chart(fig)
     trend_per_year = analyze_city_data(city_data)['trend_per_year']
     for index, row in trend_per_year.iterrows():
-        st.write(f"Год {row['year']}: Тренд {row['trend_direction']} (Коэффициент наклона: {row['slope']:.4f})")
+        st.write(f"Год {row['year']}: Тренд {row['trend_direction']}")
 
 
 def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=None, trend_direction=None,
@@ -188,7 +188,7 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=
     st.write(f"Минимальная температура: {min_temp:.2f}°C")
     st.write(f"Максимальная температура: {max_temp:.2f}°C")
     if trend_direction is not None and trend_slope is not None:
-        st.write(f"Общий тренд: {trend_direction} (коэффициент наклона: {trend_slope:.4f})")
+        st.write(f"Общий тренд: {trend_direction}")
 
     st.subheader("Сезонный профиль")
     st.write(season_stats)
@@ -196,7 +196,7 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=
     if trend_per_season is not None:
         st.subheader("Тренды по сезонам")
         for idx, row in trend_per_season.iterrows():
-            st.write(f"Сезон {row['season']}: Тренд {row['trend_direction']} (Коэффициент наклона: {row['slope']:.4f})")
+            st.write(f"Сезон {row['season']}: Тренд {row['trend_direction']}")
 
     fig = None
     if plot_type == 'line':
@@ -209,8 +209,9 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=
         fig.update_traces(marker=dict(line=dict(width=0)))
         fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers',
                         marker=dict(color='red', size=8), name="Аномалии")
+    plot_key = f"{city}_{plot_type}_temperature_plot_{int(time.time())}"
+    st.plotly_chart(fig, key=plot_key)
 
-    st.plotly_chart(fig, key=f"{city}_temperature_plot")
 
 
 def generate_excel_report(data):
