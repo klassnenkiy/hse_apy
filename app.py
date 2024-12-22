@@ -270,15 +270,7 @@ def main():
 
     filtered_data = generate_realistic_temperature_data(selected_city)
 
-    analysis = analyze_city_data(filtered_data, sensitivity)
-    season_stats = analysis['season_stats']
-    anomalies = analysis['anomalies']
-    trend_direction = analysis.get('overall_trend_direction', 'неопределено')
-    trend_slope = analysis.get('overall_trend_slope', None)
-    trend_per_season = analysis['trend_per_season']
 
-    visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction,
-                          trend_slope, trend_per_season)
 
     if selected_years:
         visualize_temperature_by_year(selected_city, filtered_data, selected_years)
@@ -331,6 +323,7 @@ def main():
                 normal_temp = seasonal_temperatures[selected_city][current_season]
                 season_data = filtered_data[filtered_data['season'] == current_season]
                 std_dev = season_data['temperature'].std()
+
                 if abs(current_temp - normal_temp) > 2 * std_dev:
                     st.warning(
                         f"Текущая температура в {selected_city} отклоняется от нормы для сезона {current_season}.")
@@ -342,6 +335,9 @@ def main():
                                   trend_slope)
             if selected_years:
                 visualize_temperature_by_year(selected_city, filtered_data, selected_years)
+
+            with st.expander(f"Исторические данные для города {selected_city}", expanded=True):
+                st.dataframe(filtered_data)
 
     st.sidebar.subheader("Дополнительные возможности")
     st.sidebar.write("1. Выбор различных типов графиков (линейный, столбчатый)")
