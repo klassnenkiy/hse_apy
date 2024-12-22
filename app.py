@@ -216,8 +216,6 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=
 
     st.subheader(f"Сезонный профиль для города {city}")
     st.write(season_stats)
-
-    # Выделим аномалии, если они есть
     if not anomalies.empty:
         st.markdown("### 🚨 **Аномалии температуры** 🚨")
         st.write(anomalies)
