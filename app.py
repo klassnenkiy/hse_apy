@@ -209,7 +209,8 @@ def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=
         fig.update_traces(marker=dict(line=dict(width=0)))
         fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers',
                         marker=dict(color='red', size=8), name="Аномалии")
-    st.plotly_chart(fig)
+
+    st.plotly_chart(fig, key=f"{city}_temperature_plot")
 
 
 def generate_excel_report(data):
