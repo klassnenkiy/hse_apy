@@ -1,6 +1,8 @@
 ### Ссылка на развернутое в Streamlit Cloud приложение.
 https://tyulyagin.streamlit.app/
 
+[Черновой ноутбук с эксперементами](https://github.com/klassnenkiy/hse_apy/blob/main/data/note_ipynb_.ipynb)
+
 # Проект: Анализ температурных данных и мониторинг текущей температуры
 
 ## Описание проекта
