@@ -78,59 +78,20 @@ def analyze_city_data(city_data, sensitivity=2.0):
             (city_data['temperature'] > city_data['rolling_mean'] + sensitivity * city_data['rolling_std']) |
             (city_data['temperature'] < city_data['rolling_mean'] - sensitivity * city_data['rolling_std']))
     season_stats = city_data.groupby('season')['temperature'].agg(['mean', 'std', 'min', 'max']).reset_index()
-    city_data['year'] = city_data['timestamp'].dt.year
-    trend_per_year = []
-    for year, group in city_data.groupby('year'):
-        group['timestamp_numeric'] = (group['timestamp'] - group['timestamp'].min()).dt.total_seconds()
-        X = group['timestamp_numeric'].values.reshape(-1, 1)
-        y = group['temperature'].values
-        model = LinearRegression()
-        model.fit(X, y)
-
-        trend_per_year.append({
-            'year': year,
-            'slope': model.coef_[0],
-            'intercept': model.intercept_,
-            'trend_direction': "положительный" if model.coef_[0] > 0 else "отрицательный" if model.coef_[0] < 0 else "плоский"
-        })
-    trend_per_season = []
-    for season, group in city_data.groupby('season'):
-        group['timestamp_numeric'] = (group['timestamp'] - group['timestamp'].min()).dt.total_seconds()
-        X = group['timestamp_numeric'].values.reshape(-1, 1)
-        y = group['temperature'].values
-        model = LinearRegression()
-        model.fit(X, y)
-
-        trend_per_season.append({
-            'season': season,
-            'slope': model.coef_[0],
-            'intercept': model.intercept_,
-            'trend_direction': "положительный" if model.coef_[0] > 0 else "отрицательный" if model.coef_[0] < 0 else "плоский"
-        })
-
-    trend_per_year = pd.DataFrame(trend_per_year).sort_values(by='year')
-    trend_per_season = pd.DataFrame(trend_per_season).sort_values(by='season')
     city_data['timestamp_numeric'] = (city_data['timestamp'] - city_data['timestamp'].min()).dt.total_seconds()
     X = city_data['timestamp_numeric'].values.reshape(-1, 1)
     y = city_data['temperature'].values
     model = LinearRegression()
-    if len(X) > 1:
-        model.fit(X, y)
-        overall_trend_slope = model.coef_[0]
-        overall_trend_direction = "положительный" if overall_trend_slope > 0 else "отрицательный" if overall_trend_slope < 0 else "плоский"
-    else:
-        overall_trend_slope = None
-        overall_trend_direction = "неопределено"
+    model.fit(X, y)
+    trend_slope = model.coef_[0]
+    trend_direction = "положительный" if trend_slope > 0 else "отрицательный" if trend_slope < 0 else "плоский"
 
     return {
         'season_stats': season_stats,
-        'trend_per_year': trend_per_year,
-        'trend_per_season': trend_per_season,
-        'overall_trend_slope': overall_trend_slope,
-        'overall_trend_direction': overall_trend_direction,
+        'trend_slope': trend_slope,
+        'trend_direction': trend_direction,
         'anomalies': city_data[city_data['anomaly'] == True]
     }
-
 
 
 
@@ -160,6 +121,35 @@ def display_temperature_data(temperatures):
     st.table(df[['Город', 'Температура', 'Эмодзи']])
 
 
+def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=None, trend_direction=None,
+                          trend_slope=None):
+    st.subheader(f"Температура в {city}")
+    mean_temp = season_stats['mean'].mean()
+    min_temp = season_stats['min'].min()
+    max_temp = season_stats['max'].max()
+    st.write(f"Средняя температура: {mean_temp:.2f}°C")
+    st.write(f"Минимальная температура: {min_temp:.2f}°C")
+    st.write(f"Максимальная температура: {max_temp:.2f}°C")
+    if trend_direction is not None and trend_slope is not None:
+        st.write(f"Тренд: {trend_direction} (коэффициент наклона: {trend_slope:.4f})")
+
+    st.subheader("Сезонный профиль")
+    st.write(season_stats)
+
+    fig = None
+    if plot_type == 'line':
+        fig = px.line(data, x='timestamp', y='temperature', title=f"Температура в {city}")
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'),
+                        name="Аномалии")
+    elif plot_type == 'bar':
+        fig = px.bar(data, x='timestamp', y='temperature', title=f"Температура в {city}", color='temperature',
+                     color_continuous_scale='Viridis', opacity=0.8)
+        fig.update_traces(marker=dict(line=dict(width=0)))
+        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers',
+                        marker=dict(color='red', size=8), name="Аномалии")
+    st.plotly_chart(fig)
+
+
 def visualize_temperature_by_year(city, plot_data, selected_years):
     city_data = plot_data[plot_data['city'] == city].copy()
     city_data['year'] = city_data['timestamp'].dt.year
@@ -173,45 +163,6 @@ def visualize_temperature_by_year(city, plot_data, selected_years):
         template='plotly_white'
     )
     st.plotly_chart(fig)
-    trend_per_year = analyze_city_data(city_data)['trend_per_year']
-    for index, row in trend_per_year.iterrows():
-        st.write(f"Год {row['year']}: Тренд {row['trend_direction']}")
-
-
-def visualize_temperature(data, season_stats, anomalies, plot_type='line', city=None, trend_direction=None,
-                          trend_slope=None, trend_per_season=None):
-    st.subheader(f"Температура в {city}")
-    mean_temp = season_stats['mean'].mean()
-    min_temp = season_stats['min'].min()
-    max_temp = season_stats['max'].max()
-    st.write(f"Средняя температура: {mean_temp:.2f}°C")
-    st.write(f"Минимальная температура: {min_temp:.2f}°C")
-    st.write(f"Максимальная температура: {max_temp:.2f}°C")
-    if trend_direction is not None and trend_slope is not None:
-        st.write(f"Общий тренд: {trend_direction}")
-
-    st.subheader("Сезонный профиль")
-    st.write(season_stats)
-
-    if trend_per_season is not None:
-        st.subheader("Тренды по сезонам")
-        for idx, row in trend_per_season.iterrows():
-            st.write(f"Сезон {row['season']}: Тренд {row['trend_direction']}")
-
-    fig = None
-    if plot_type == 'line':
-        fig = px.line(data, x='timestamp', y='temperature', title=f"Температура в {city}")
-        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers', marker=dict(color='red'),
-                        name="Аномалии")
-    elif plot_type == 'bar':
-        fig = px.bar(data, x='timestamp', y='temperature', title=f"Температура в {city}", color='temperature',
-                     color_continuous_scale='Viridis', opacity=0.8)
-        fig.update_traces(marker=dict(line=dict(width=0)))
-        fig.add_scatter(x=anomalies['timestamp'], y=anomalies['temperature'], mode='markers',
-                        marker=dict(color='red', size=8), name="Аномалии")
-    plot_key = f"{city}_{plot_type}_temperature_plot_{int(time.time())}"
-    st.plotly_chart(fig, key=plot_key)
-
 
 
 def generate_excel_report(data):
@@ -288,11 +239,15 @@ def main():
                 combined_data = pd.concat(all_data)
                 season_stats = analyze_city_data(combined_data, sensitivity)['season_stats']
                 anomalies = analyze_city_data(combined_data, sensitivity)['anomalies']
+                trend_slope = analyze_city_data(combined_data, sensitivity)['overall_trend_slope']
+                trend_direction = analyze_city_data(combined_data, sensitivity)['overall_trend_direction']
+                analysis = analyze_city_data(filtered_data, sensitivity)
+                trend_per_season = analysis['trend_per_season']
                 for city in cities_selected:
                     city_data = combined_data[combined_data['city'] == city]
                     city_season_stats = season_stats[season_stats['season'].isin(city_data['season'].unique())]
                     city_anomalies = anomalies[anomalies['city'] == city]
-                    visualize_temperature(city_data, city_season_stats, city_anomalies, plot_type, city)
+                    visualize_temperature(city_data, city_season_stats, city_anomalies, plot_type, city, selected_city, trend_direction, trend_slope, trend_per_season)
                     if selected_years:
                         visualize_temperature_by_year(city, combined_data, selected_years)
 
@@ -317,10 +272,16 @@ def main():
             analysis = analyze_city_data(filtered_data, sensitivity)
             season_stats = analysis['season_stats']
             anomalies = analysis['anomalies']
-            trend_direction = analysis['trend_direction']
-            visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction)
+            trend_direction = analysis.get('overall_trend_direction', 'неопределено')
+            trend_slope = analysis.get('overall_trend_slope', None)
+            trend_per_season = analysis['trend_per_season']
+            visualize_temperature(filtered_data, season_stats, anomalies, plot_type, selected_city, trend_direction,
+                                  trend_slope, trend_per_season)
             if selected_years:
                 visualize_temperature_by_year(selected_city, filtered_data, selected_years)
+
+            with st.expander(f"Исторические данные для города {selected_city}", expanded=True):
+                st.dataframe(filtered_data)
 
         st.sidebar.subheader("Дополнительные возможности")
         st.sidebar.write("1. Выбор различных типов графиков (линейный, столбчатый)")
@@ -334,4 +295,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
